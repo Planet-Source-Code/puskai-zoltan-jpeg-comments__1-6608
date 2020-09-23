@@ -1,0 +1,581 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN">
+<!-- saved from url=(0042)http://www.randomlogic.com/nsdg/28733.html -->
+<HTML><HEAD><TITLE>wrjpgcom.c</TITLE>
+<META content="text/html; charset=windows-1252" http-equiv=Content-Type>
+<META content="MSHTML 5.00.2014.210" name=GENERATOR></HEAD>
+<BODY><PRE><A name=1><FONT size=-1>1     </FONT></A><FONT color=red>/*
+<A name=2><FONT color=#000000 size=-1>2     </FONT></A> * wrjpgcom.c
+<A name=3><FONT color=#000000 size=-1>3     </FONT></A> *
+<A name=4><FONT color=#000000 size=-1>4     </FONT></A> * Copyright (C) 1994-1995, Thomas G. Lane.
+<A name=5><FONT color=#000000 size=-1>5     </FONT></A> * This file is part of the Independent JPEG Group's software.
+<A name=6><FONT color=#000000 size=-1>6     </FONT></A> * For conditions of distribution and use, see the accompanying README file.
+<A name=7><FONT color=#000000 size=-1>7     </FONT></A> *
+<A name=8><FONT color=#000000 size=-1>8     </FONT></A> * This file contains a very simple stand-alone application that inserts
+<A name=9><FONT color=#000000 size=-1>9     </FONT></A> * user-supplied text as a COM (comment) marker in a JFIF file.
+<A name=10><FONT color=#000000 size=-1>10     </FONT></A> * This may be useful as an example of the minimum logic needed to parse
+<A name=11><FONT color=#000000 size=-1>11     </FONT></A> * JPEG markers.
+<A name=12><FONT color=#000000 size=-1>12     </FONT></A> */</FONT>
+<A name=13><FONT size=-1>13     </FONT></A>
+<A name=14><FONT size=-1>14     </FONT></A><FONT color=green>#define</FONT> JPEG_CJPEG_DJPEG	<FONT color=red>/* to get the command-line config symbols */</FONT>
+<A name=15><FONT size=-1>15     </FONT></A><FONT color=green>#include</FONT> <FONT color=#dc0dc>"jinclude.h"</FONT>		<FONT color=red>/* get auto-config symbols, &lt;stdio.h&gt; */</FONT>
+<A name=16><FONT size=-1>16     </FONT></A>
+<A name=17><FONT size=-1>17     </FONT></A><FONT color=green>#ifndef</FONT> HAVE_STDLIB_H		<FONT color=red>/* &lt;stdlib.h&gt; should declare malloc() */</FONT>
+<A name=18><FONT size=-1>18     </FONT></A><B>extern</B> <B>void</B> * malloc ();
+<A name=19><FONT size=-1>19     </FONT></A><FONT color=green>#endif</FONT>
+<A name=20><FONT size=-1>20     </FONT></A><FONT color=green>#include</FONT> &lt;ctype.h&gt;		<FONT color=red>/* to declare isupper(), tolower() */</FONT>
+<A name=21><FONT size=-1>21     </FONT></A><FONT color=green>#ifdef</FONT> USE_SETMODE
+<A name=22><FONT size=-1>22     </FONT></A><FONT color=green>#include</FONT> &lt;fcntl.h&gt;		<FONT color=red>/* to declare setmode()'s parameter macros */</FONT>
+<A name=23><FONT size=-1>23     </FONT></A><FONT color=red>/* If you have setmode() but not &lt;io.h&gt;, just delete this line: */</FONT>
+<A name=24><FONT size=-1>24     </FONT></A><FONT color=green>#include</FONT> &lt;io.h&gt;			<FONT color=red>/* to declare setmode() */</FONT>
+<A name=25><FONT size=-1>25     </FONT></A><FONT color=green>#endif</FONT>
+<A name=26><FONT size=-1>26     </FONT></A>
+<A name=27><FONT size=-1>27     </FONT></A><FONT color=green>#ifdef</FONT> USE_CCOMMAND		<FONT color=red>/* command-line reader for Macintosh */</FONT>
+<A name=28><FONT size=-1>28     </FONT></A><FONT color=green>#ifdef</FONT> __MWERKS__
+<A name=29><FONT size=-1>29     </FONT></A><FONT color=green>#include</FONT> &lt;SIOUX.h&gt;              <FONT color=red>/* Metrowerks needs this */</FONT>
+<A name=30><FONT size=-1>30     </FONT></A><FONT color=green>#include</FONT> &lt;console.h&gt;		<FONT color=red>/* ... and this */</FONT>
+<A name=31><FONT size=-1>31     </FONT></A><FONT color=green>#endif</FONT>
+<A name=32><FONT size=-1>32     </FONT></A><FONT color=green>#ifdef</FONT> THINK_C
+<A name=33><FONT size=-1>33     </FONT></A><FONT color=green>#include</FONT> &lt;console.h&gt;		<FONT color=red>/* Think declares it here */</FONT>
+<A name=34><FONT size=-1>34     </FONT></A><FONT color=green>#endif</FONT>
+<A name=35><FONT size=-1>35     </FONT></A><FONT color=green>#endif</FONT>
+<A name=36><FONT size=-1>36     </FONT></A>
+<A name=37><FONT size=-1>37     </FONT></A><FONT color=green>#ifdef</FONT> DONT_USE_B_MODE		<FONT color=red>/* define mode parameters for fopen() */</FONT>
+<A name=38><FONT size=-1>38     </FONT></A><FONT color=green>#define</FONT> READ_BINARY	<FONT color=#dc0dc>"r"</FONT>
+<A name=39><FONT size=-1>39     </FONT></A><FONT color=green>#define</FONT> WRITE_BINARY	<FONT color=#dc0dc>"w"</FONT>
+<A name=40><FONT size=-1>40     </FONT></A><FONT color=green>#else</FONT>
+<A name=41><FONT size=-1>41     </FONT></A><FONT color=green>#define</FONT> READ_BINARY	<FONT color=#dc0dc>"rb"</FONT>
+<A name=42><FONT size=-1>42     </FONT></A><FONT color=green>#define</FONT> WRITE_BINARY	<FONT color=#dc0dc>"wb"</FONT>
+<A name=43><FONT size=-1>43     </FONT></A><FONT color=green>#endif</FONT>
+<A name=44><FONT size=-1>44     </FONT></A>
+<A name=45><FONT size=-1>45     </FONT></A><FONT color=green>#ifndef</FONT> EXIT_FAILURE		<FONT color=red>/* define exit() codes if not provided */</FONT>
+<A name=46><FONT size=-1>46     </FONT></A><FONT color=green>#define</FONT> EXIT_FAILURE  1
+<A name=47><FONT size=-1>47     </FONT></A><FONT color=green>#endif</FONT>
+<A name=48><FONT size=-1>48     </FONT></A><FONT color=green>#ifndef</FONT> EXIT_SUCCESS
+<A name=49><FONT size=-1>49     </FONT></A><FONT color=green>#ifdef</FONT> VMS
+<A name=50><FONT size=-1>50     </FONT></A><FONT color=green>#define</FONT> EXIT_SUCCESS  1		<FONT color=red>/* VMS is very nonstandard */</FONT>
+<A name=51><FONT size=-1>51     </FONT></A><FONT color=green>#else</FONT>
+<A name=52><FONT size=-1>52     </FONT></A><FONT color=green>#define</FONT> EXIT_SUCCESS  0
+<A name=53><FONT size=-1>53     </FONT></A><FONT color=green>#endif</FONT>
+<A name=54><FONT size=-1>54     </FONT></A><FONT color=green>#endif</FONT>
+<A name=55><FONT size=-1>55     </FONT></A>
+<A name=56><FONT size=-1>56     </FONT></A><FONT color=red>/* Reduce this value if your malloc() can't allocate blocks up to 64K.
+<A name=57><FONT color=#000000 size=-1>57     </FONT></A> * On DOS, compiling in large model is usually a better solution.
+<A name=58><FONT color=#000000 size=-1>58     </FONT></A> */</FONT>
+<A name=59><FONT size=-1>59     </FONT></A>
+<A name=60><FONT size=-1>60     </FONT></A><FONT color=green>#ifndef</FONT> MAX_COM_LENGTH
+<A name=61><FONT size=-1>61     </FONT></A><FONT color=green>#define</FONT> MAX_COM_LENGTH 65000	<FONT color=red>/* must be &lt; 65534 in any case */</FONT>
+<A name=62><FONT size=-1>62     </FONT></A><FONT color=green>#endif</FONT>
+<A name=63><FONT size=-1>63     </FONT></A>
+<A name=64><FONT size=-1>64     </FONT></A>
+<A name=65><FONT size=-1>65     </FONT></A><FONT color=red>/*
+<A name=66><FONT color=#000000 size=-1>66     </FONT></A> * These macros are used to read the input file and write the output file.
+<A name=67><FONT color=#000000 size=-1>67     </FONT></A> * To reuse this code in another application, you might need to change these.
+<A name=68><FONT color=#000000 size=-1>68     </FONT></A> */</FONT>
+<A name=69><FONT size=-1>69     </FONT></A>
+<A name=70><FONT size=-1>70     </FONT></A><B>static</B> FILE * infile;		<FONT color=red>/* input JPEG file */</FONT>
+<A name=71><FONT size=-1>71     </FONT></A>
+<A name=72><FONT size=-1>72     </FONT></A><FONT color=red>/* Return next input byte, or EOF if no more */</FONT>
+<A name=73><FONT size=-1>73     </FONT></A><FONT color=green>#define</FONT> NEXTBYTE()  getc(infile)
+<A name=74><FONT size=-1>74     </FONT></A>
+<A name=75><FONT size=-1>75     </FONT></A><B>static</B> FILE * outfile;		<FONT color=red>/* output JPEG file */</FONT>
+<A name=76><FONT size=-1>76     </FONT></A>
+<A name=77><FONT size=-1>77     </FONT></A><FONT color=red>/* Emit an output byte */</FONT>
+<A name=78><FONT size=-1>78     </FONT></A><FONT color=green>#define</FONT> PUTBYTE(x)  putc((x), outfile)
+<A name=79><FONT size=-1>79     </FONT></A>
+<A name=80><FONT size=-1>80     </FONT></A>
+<A name=81><FONT size=-1>81     </FONT></A><FONT color=red>/* Error exit handler */</FONT>
+<A name=82><FONT size=-1>82     </FONT></A><FONT color=green>#define</FONT> ERREXIT(msg)  (fprintf(stderr, <FONT color=#dc0dc>"%s\n"</FONT>, msg), exit(EXIT_FAILURE))
+<A name=83><FONT size=-1>83     </FONT></A>
+<A name=84><FONT size=-1>84     </FONT></A>
+<A name=85><FONT size=-1>85     </FONT></A><FONT color=red>/* Read one byte, testing for EOF */</FONT>
+<A name=86><FONT size=-1>86     </FONT></A><B>static</B> <B>int</B>
+<A name=87><FONT size=-1>87     </FONT></A>read_1_byte (void)
+<A name=88><FONT size=-1>88     </FONT></A><FONT size=+2><B>{</B></FONT>
+<A name=89><FONT size=-1>89     </FONT></A>  <B>int</B> c;
+<A name=90><FONT size=-1>90     </FONT></A>
+<A name=91><FONT size=-1>91     </FONT></A>  c = NEXTBYTE();
+<A name=92><FONT size=-1>92     </FONT></A>  <B>if</B> (c == EOF)
+<A name=93><FONT size=-1>93     </FONT></A>    ERREXIT(<FONT color=#dc0dc>"Premature EOF in JPEG file"</FONT>);
+<A name=94><FONT size=-1>94     </FONT></A>  <B>return</B> c;
+<A name=95><FONT size=-1>95     </FONT></A><FONT size=+2><B>}</B></FONT>
+<A name=96><FONT size=-1>96     </FONT></A>
+<A name=97><FONT size=-1>97     </FONT></A><FONT color=red>/* Read 2 bytes, convert to unsigned int */</FONT>
+<A name=98><FONT size=-1>98     </FONT></A><FONT color=red>/* All 2-byte quantities in JPEG markers are MSB first */</FONT>
+<A name=99><FONT size=-1>99     </FONT></A><B>static</B> <B>unsigned</B> <B>int</B>
+<A name=100><FONT size=-1>100     </FONT></A>read_2_bytes (void)
+<A name=101><FONT size=-1>101     </FONT></A><FONT size=+2><B>{</B></FONT>
+<A name=102><FONT size=-1>102     </FONT></A>  <B>int</B> c1, c2;
+<A name=103><FONT size=-1>103     </FONT></A>
+<A name=104><FONT size=-1>104     </FONT></A>  c1 = NEXTBYTE();
+<A name=105><FONT size=-1>105     </FONT></A>  <B>if</B> (c1 == EOF)
+<A name=106><FONT size=-1>106     </FONT></A>    ERREXIT(<FONT color=#dc0dc>"Premature EOF in JPEG file"</FONT>);
+<A name=107><FONT size=-1>107     </FONT></A>  c2 = NEXTBYTE();
+<A name=108><FONT size=-1>108     </FONT></A>  <B>if</B> (c2 == EOF)
+<A name=109><FONT size=-1>109     </FONT></A>    ERREXIT(<FONT color=#dc0dc>"Premature EOF in JPEG file"</FONT>);
+<A name=110><FONT size=-1>110     </FONT></A>  <B>return</B> (((<B>unsigned</B> int) c1) &lt;&lt; 8) + ((<B>unsigned</B> int) c2);
+<A name=111><FONT size=-1>111     </FONT></A><FONT size=+2><B>}</B></FONT>
+<A name=112><FONT size=-1>112     </FONT></A>
+<A name=113><FONT size=-1>113     </FONT></A>
+<A name=114><FONT size=-1>114     </FONT></A><FONT color=red>/* Routines to write data to output file */</FONT>
+<A name=115><FONT size=-1>115     </FONT></A>
+<A name=116><FONT size=-1>116     </FONT></A><B>static</B> <B>void</B>
+<A name=117><FONT size=-1>117     </FONT></A>write_1_byte (<B>int</B> c)
+<A name=118><FONT size=-1>118     </FONT></A><FONT size=+2><B>{</B></FONT>
+<A name=119><FONT size=-1>119     </FONT></A>  PUTBYTE(c);
+<A name=120><FONT size=-1>120     </FONT></A><FONT size=+2><B>}</B></FONT>
+<A name=121><FONT size=-1>121     </FONT></A>
+<A name=122><FONT size=-1>122     </FONT></A><B>static</B> <B>void</B>
+<A name=123><FONT size=-1>123     </FONT></A>write_2_bytes (<B>unsigned</B> <B>int</B> val)
+<A name=124><FONT size=-1>124     </FONT></A><FONT size=+2><B>{</B></FONT>
+<A name=125><FONT size=-1>125     </FONT></A>  PUTBYTE((val &gt;&gt; 8) &amp; 0xFF);
+<A name=126><FONT size=-1>126     </FONT></A>  PUTBYTE(val &amp; 0xFF);
+<A name=127><FONT size=-1>127     </FONT></A><FONT size=+2><B>}</B></FONT>
+<A name=128><FONT size=-1>128     </FONT></A>
+<A name=129><FONT size=-1>129     </FONT></A><B>static</B> <B>void</B>
+<A name=130><FONT size=-1>130     </FONT></A>write_marker (<B>int</B> marker)
+<A name=131><FONT size=-1>131     </FONT></A><FONT size=+2><B>{</B></FONT>
+<A name=132><FONT size=-1>132     </FONT></A>  PUTBYTE(0xFF);
+<A name=133><FONT size=-1>133     </FONT></A>  PUTBYTE(marker);
+<A name=134><FONT size=-1>134     </FONT></A><FONT size=+2><B>}</B></FONT>
+<A name=135><FONT size=-1>135     </FONT></A>
+<A name=136><FONT size=-1>136     </FONT></A><B>static</B> <B>void</B>
+<A name=137><FONT size=-1>137     </FONT></A>copy_rest_of_file (void)
+<A name=138><FONT size=-1>138     </FONT></A><FONT size=+2><B>{</B></FONT>
+<A name=139><FONT size=-1>139     </FONT></A>  <B>int</B> c;
+<A name=140><FONT size=-1>140     </FONT></A>
+<A name=141><FONT size=-1>141     </FONT></A>  <B>while</B> ((c = NEXTBYTE()) != EOF)
+<A name=142><FONT size=-1>142     </FONT></A>    PUTBYTE(c);
+<A name=143><FONT size=-1>143     </FONT></A><FONT size=+2><B>}</B></FONT>
+<A name=144><FONT size=-1>144     </FONT></A>
+<A name=145><FONT size=-1>145     </FONT></A>
+<A name=146><FONT size=-1>146     </FONT></A><FONT color=red>/*
+<A name=147><FONT color=#000000 size=-1>147     </FONT></A> * JPEG markers consist of one or more 0xFF bytes, followed by a marker
+<A name=148><FONT color=#000000 size=-1>148     </FONT></A> * code byte (which is not an FF).  Here are the marker codes of interest
+<A name=149><FONT color=#000000 size=-1>149     </FONT></A> * in this program.  (See jdmarker.c for a more complete list.)
+<A name=150><FONT color=#000000 size=-1>150     </FONT></A> */</FONT>
+<A name=151><FONT size=-1>151     </FONT></A>
+<A name=152><FONT size=-1>152     </FONT></A><FONT color=green>#define</FONT> M_SOF0  0xC0		<FONT color=red>/* Start Of Frame N */</FONT>
+<A name=153><FONT size=-1>153     </FONT></A><FONT color=green>#define</FONT> M_SOF1  0xC1		<FONT color=red>/* N indicates which compression process */</FONT>
+<A name=154><FONT size=-1>154     </FONT></A><FONT color=green>#define</FONT> M_SOF2  0xC2		<FONT color=red>/* Only SOF0-SOF2 are now in common use */</FONT>
+<A name=155><FONT size=-1>155     </FONT></A><FONT color=green>#define</FONT> M_SOF3  0xC3
+<A name=156><FONT size=-1>156     </FONT></A><FONT color=green>#define</FONT> M_SOF5  0xC5		<FONT color=red>/* NB: codes C4 and CC are NOT SOF markers */</FONT>
+<A name=157><FONT size=-1>157     </FONT></A><FONT color=green>#define</FONT> M_SOF6  0xC6
+<A name=158><FONT size=-1>158     </FONT></A><FONT color=green>#define</FONT> M_SOF7  0xC7
+<A name=159><FONT size=-1>159     </FONT></A><FONT color=green>#define</FONT> M_SOF9  0xC9
+<A name=160><FONT size=-1>160     </FONT></A><FONT color=green>#define</FONT> M_SOF10 0xCA
+<A name=161><FONT size=-1>161     </FONT></A><FONT color=green>#define</FONT> M_SOF11 0xCB
+<A name=162><FONT size=-1>162     </FONT></A><FONT color=green>#define</FONT> M_SOF13 0xCD
+<A name=163><FONT size=-1>163     </FONT></A><FONT color=green>#define</FONT> M_SOF14 0xCE
+<A name=164><FONT size=-1>164     </FONT></A><FONT color=green>#define</FONT> M_SOF15 0xCF
+<A name=165><FONT size=-1>165     </FONT></A><FONT color=green>#define</FONT> M_SOI   0xD8		<FONT color=red>/* Start Of Image (beginning of datastream) */</FONT>
+<A name=166><FONT size=-1>166     </FONT></A><FONT color=green>#define</FONT> M_EOI   0xD9		<FONT color=red>/* End Of Image (end of datastream) */</FONT>
+<A name=167><FONT size=-1>167     </FONT></A><FONT color=green>#define</FONT> M_SOS   0xDA		<FONT color=red>/* Start Of Scan (begins compressed data) */</FONT>
+<A name=168><FONT size=-1>168     </FONT></A><FONT color=green>#define</FONT> M_COM   0xFE		<FONT color=red>/* COMment */</FONT>
+<A name=169><FONT size=-1>169     </FONT></A>
+<A name=170><FONT size=-1>170     </FONT></A>
+<A name=171><FONT size=-1>171     </FONT></A><FONT color=red>/*
+<A name=172><FONT color=#000000 size=-1>172     </FONT></A> * Find the next JPEG marker and return its marker code.
+<A name=173><FONT color=#000000 size=-1>173     </FONT></A> * We expect at least one FF byte, possibly more if the compressor used FFs
+<A name=174><FONT color=#000000 size=-1>174     </FONT></A> * to pad the file.  (Padding FFs will NOT be replicated in the output file.)
+<A name=175><FONT color=#000000 size=-1>175     </FONT></A> * There could also be non-FF garbage between markers.  The treatment of such
+<A name=176><FONT color=#000000 size=-1>176     </FONT></A> * garbage is unspecified; we choose to skip over it but emit a warning msg.
+<A name=177><FONT color=#000000 size=-1>177     </FONT></A> * NB: this routine must not be used after seeing SOS marker, since it will
+<A name=178><FONT color=#000000 size=-1>178     </FONT></A> * not deal correctly with FF/00 sequences in the compressed image data...
+<A name=179><FONT color=#000000 size=-1>179     </FONT></A> */</FONT>
+<A name=180><FONT size=-1>180     </FONT></A>
+<A name=181><FONT size=-1>181     </FONT></A><B>static</B> <B>int</B>
+<A name=182><FONT size=-1>182     </FONT></A>next_marker (void)
+<A name=183><FONT size=-1>183     </FONT></A><FONT size=+2><B>{</B></FONT>
+<A name=184><FONT size=-1>184     </FONT></A>  <B>int</B> c;
+<A name=185><FONT size=-1>185     </FONT></A>  <B>int</B> discarded_bytes = 0;
+<A name=186><FONT size=-1>186     </FONT></A>
+<A name=187><FONT size=-1>187     </FONT></A>  <FONT color=red>/* Find 0xFF byte; count and skip any non-FFs. */</FONT>
+<A name=188><FONT size=-1>188     </FONT></A>  c = read_1_byte();
+<A name=189><FONT size=-1>189     </FONT></A>  <B>while</B> (c != 0xFF) <FONT size=+2><B>{</B></FONT>
+<A name=190><FONT size=-1>190     </FONT></A>    discarded_bytes++;
+<A name=191><FONT size=-1>191     </FONT></A>    c = read_1_byte();
+<A name=192><FONT size=-1>192     </FONT></A>  <FONT size=+2><B>}</B></FONT>
+<A name=193><FONT size=-1>193     </FONT></A>  <FONT color=red>/* Get marker code byte, swallowing any duplicate FF bytes.  Extra FFs
+<A name=194><FONT color=#000000 size=-1>194     </FONT></A>   * are legal as pad bytes, so don't count them in discarded_bytes.
+<A name=195><FONT color=#000000 size=-1>195     </FONT></A>   */</FONT>
+<A name=196><FONT size=-1>196     </FONT></A>  <B>do</B> <FONT size=+2><B>{</B></FONT>
+<A name=197><FONT size=-1>197     </FONT></A>    c = read_1_byte();
+<A name=198><FONT size=-1>198     </FONT></A>  <FONT size=+2><B>}</B></FONT> <B>while</B> (c == 0xFF);
+<A name=199><FONT size=-1>199     </FONT></A>
+<A name=200><FONT size=-1>200     </FONT></A>  <B>if</B> (discarded_bytes != 0) <FONT size=+2><B>{</B></FONT>
+<A name=201><FONT size=-1>201     </FONT></A>    fprintf(stderr, <FONT color=#dc0dc>"Warning: garbage data found in JPEG file\n"</FONT>);
+<A name=202><FONT size=-1>202     </FONT></A>  <FONT size=+2><B>}</B></FONT>
+<A name=203><FONT size=-1>203     </FONT></A>
+<A name=204><FONT size=-1>204     </FONT></A>  <B>return</B> c;
+<A name=205><FONT size=-1>205     </FONT></A><FONT size=+2><B>}</B></FONT>
+<A name=206><FONT size=-1>206     </FONT></A>
+<A name=207><FONT size=-1>207     </FONT></A>
+<A name=208><FONT size=-1>208     </FONT></A><FONT color=red>/*
+<A name=209><FONT color=#000000 size=-1>209     </FONT></A> * Read the initial marker, which should be SOI.
+<A name=210><FONT color=#000000 size=-1>210     </FONT></A> * For a JFIF file, the first two bytes of the file should be literally
+<A name=211><FONT color=#000000 size=-1>211     </FONT></A> * 0xFF M_SOI.  To be more general, we could use next_marker, but if the
+<A name=212><FONT color=#000000 size=-1>212     </FONT></A> * input file weren't actually JPEG at all, next_marker might read the whole
+<A name=213><FONT color=#000000 size=-1>213     </FONT></A> * file and then return a misleading error message...
+<A name=214><FONT color=#000000 size=-1>214     </FONT></A> */</FONT>
+<A name=215><FONT size=-1>215     </FONT></A>
+<A name=216><FONT size=-1>216     </FONT></A><B>static</B> <B>int</B>
+<A name=217><FONT size=-1>217     </FONT></A>first_marker (void)
+<A name=218><FONT size=-1>218     </FONT></A><FONT size=+2><B>{</B></FONT>
+<A name=219><FONT size=-1>219     </FONT></A>  <B>int</B> c1, c2;
+<A name=220><FONT size=-1>220     </FONT></A>
+<A name=221><FONT size=-1>221     </FONT></A>  c1 = NEXTBYTE();
+<A name=222><FONT size=-1>222     </FONT></A>  c2 = NEXTBYTE();
+<A name=223><FONT size=-1>223     </FONT></A>  <B>if</B> (c1 != 0xFF || c2 != M_SOI)
+<A name=224><FONT size=-1>224     </FONT></A>    ERREXIT(<FONT color=#dc0dc>"Not a JPEG file"</FONT>);
+<A name=225><FONT size=-1>225     </FONT></A>  <B>return</B> c2;
+<A name=226><FONT size=-1>226     </FONT></A><FONT size=+2><B>}</B></FONT>
+<A name=227><FONT size=-1>227     </FONT></A>
+<A name=228><FONT size=-1>228     </FONT></A>
+<A name=229><FONT size=-1>229     </FONT></A><FONT color=red>/*
+<A name=230><FONT color=#000000 size=-1>230     </FONT></A> * Most types of marker are followed by a variable-length parameter segment.
+<A name=231><FONT color=#000000 size=-1>231     </FONT></A> * This routine skips over the parameters for any marker we don't otherwise
+<A name=232><FONT color=#000000 size=-1>232     </FONT></A> * want to process.
+<A name=233><FONT color=#000000 size=-1>233     </FONT></A> * Note that we MUST skip the parameter segment explicitly in order not to
+<A name=234><FONT color=#000000 size=-1>234     </FONT></A> * be fooled by 0xFF bytes that might appear within the parameter segment;
+<A name=235><FONT color=#000000 size=-1>235     </FONT></A> * such bytes do NOT introduce new markers.
+<A name=236><FONT color=#000000 size=-1>236     </FONT></A> */</FONT>
+<A name=237><FONT size=-1>237     </FONT></A>
+<A name=238><FONT size=-1>238     </FONT></A><B>static</B> <B>void</B>
+<A name=239><FONT size=-1>239     </FONT></A>copy_variable (void)
+<A name=240><FONT size=-1>240     </FONT></A><FONT color=red>/* Copy an unknown or uninteresting variable-length marker */</FONT>
+<A name=241><FONT size=-1>241     </FONT></A><FONT size=+2><B>{</B></FONT>
+<A name=242><FONT size=-1>242     </FONT></A>  <B>unsigned</B> <B>int</B> length;
+<A name=243><FONT size=-1>243     </FONT></A>
+<A name=244><FONT size=-1>244     </FONT></A>  <FONT color=red>/* Get the marker parameter length count */</FONT>
+<A name=245><FONT size=-1>245     </FONT></A>  length = read_2_bytes();
+<A name=246><FONT size=-1>246     </FONT></A>  write_2_bytes(length);
+<A name=247><FONT size=-1>247     </FONT></A>  <FONT color=red>/* Length includes itself, so must be at least 2 */</FONT>
+<A name=248><FONT size=-1>248     </FONT></A>  <B>if</B> (length &lt; 2)
+<A name=249><FONT size=-1>249     </FONT></A>    ERREXIT(<FONT color=#dc0dc>"Erroneous JPEG marker length"</FONT>);
+<A name=250><FONT size=-1>250     </FONT></A>  length -= 2;
+<A name=251><FONT size=-1>251     </FONT></A>  <FONT color=red>/* Skip over the remaining bytes */</FONT>
+<A name=252><FONT size=-1>252     </FONT></A>  <B>while</B> (length &gt; 0) <FONT size=+2><B>{</B></FONT>
+<A name=253><FONT size=-1>253     </FONT></A>    write_1_byte(read_1_byte());
+<A name=254><FONT size=-1>254     </FONT></A>    length--;
+<A name=255><FONT size=-1>255     </FONT></A>  <FONT size=+2><B>}</B></FONT>
+<A name=256><FONT size=-1>256     </FONT></A><FONT size=+2><B>}</B></FONT>
+<A name=257><FONT size=-1>257     </FONT></A>
+<A name=258><FONT size=-1>258     </FONT></A><B>static</B> <B>void</B>
+<A name=259><FONT size=-1>259     </FONT></A>skip_variable (void)
+<A name=260><FONT size=-1>260     </FONT></A><FONT color=red>/* Skip over an unknown or uninteresting variable-length marker */</FONT>
+<A name=261><FONT size=-1>261     </FONT></A><FONT size=+2><B>{</B></FONT>
+<A name=262><FONT size=-1>262     </FONT></A>  <B>unsigned</B> <B>int</B> length;
+<A name=263><FONT size=-1>263     </FONT></A>
+<A name=264><FONT size=-1>264     </FONT></A>  <FONT color=red>/* Get the marker parameter length count */</FONT>
+<A name=265><FONT size=-1>265     </FONT></A>  length = read_2_bytes();
+<A name=266><FONT size=-1>266     </FONT></A>  <FONT color=red>/* Length includes itself, so must be at least 2 */</FONT>
+<A name=267><FONT size=-1>267     </FONT></A>  <B>if</B> (length &lt; 2)
+<A name=268><FONT size=-1>268     </FONT></A>    ERREXIT(<FONT color=#dc0dc>"Erroneous JPEG marker length"</FONT>);
+<A name=269><FONT size=-1>269     </FONT></A>  length -= 2;
+<A name=270><FONT size=-1>270     </FONT></A>  <FONT color=red>/* Skip over the remaining bytes */</FONT>
+<A name=271><FONT size=-1>271     </FONT></A>  <B>while</B> (length &gt; 0) <FONT size=+2><B>{</B></FONT>
+<A name=272><FONT size=-1>272     </FONT></A>    (void) read_1_byte();
+<A name=273><FONT size=-1>273     </FONT></A>    length--;
+<A name=274><FONT size=-1>274     </FONT></A>  <FONT size=+2><B>}</B></FONT>
+<A name=275><FONT size=-1>275     </FONT></A><FONT size=+2><B>}</B></FONT>
+<A name=276><FONT size=-1>276     </FONT></A>
+<A name=277><FONT size=-1>277     </FONT></A>
+<A name=278><FONT size=-1>278     </FONT></A><FONT color=red>/*
+<A name=279><FONT color=#000000 size=-1>279     </FONT></A> * Parse the marker stream until SOFn or EOI is seen;
+<A name=280><FONT color=#000000 size=-1>280     </FONT></A> * copy data to output, but discard COM markers unless keep_COM is true.
+<A name=281><FONT color=#000000 size=-1>281     </FONT></A> */</FONT>
+<A name=282><FONT size=-1>282     </FONT></A>
+<A name=283><FONT size=-1>283     </FONT></A><B>static</B> <B>int</B>
+<A name=284><FONT size=-1>284     </FONT></A>scan_JPEG_header (<B>int</B> keep_COM)
+<A name=285><FONT size=-1>285     </FONT></A><FONT size=+2><B>{</B></FONT>
+<A name=286><FONT size=-1>286     </FONT></A>  <B>int</B> marker;
+<A name=287><FONT size=-1>287     </FONT></A>
+<A name=288><FONT size=-1>288     </FONT></A>  <FONT color=red>/* Expect SOI at start of file */</FONT>
+<A name=289><FONT size=-1>289     </FONT></A>  <B>if</B> (first_marker() != M_SOI)
+<A name=290><FONT size=-1>290     </FONT></A>    ERREXIT(<FONT color=#dc0dc>"Expected SOI marker first"</FONT>);
+<A name=291><FONT size=-1>291     </FONT></A>  write_marker(M_SOI);
+<A name=292><FONT size=-1>292     </FONT></A>
+<A name=293><FONT size=-1>293     </FONT></A>  <FONT color=red>/* Scan miscellaneous markers until we reach SOFn. */</FONT>
+<A name=294><FONT size=-1>294     </FONT></A>  <B>for</B> (;;) <FONT size=+2><B>{</B></FONT>
+<A name=295><FONT size=-1>295     </FONT></A>    marker = next_marker();
+<A name=296><FONT size=-1>296     </FONT></A>    <B>switch</B> (marker) <FONT size=+2><B>{</B></FONT>
+<A name=297><FONT size=-1>297     </FONT></A>    <B>case</B> M_SOF0:		<FONT color=red>/* Baseline */</FONT>
+<A name=298><FONT size=-1>298     </FONT></A>    <B>case</B> M_SOF1:		<FONT color=red>/* Extended sequential, Huffman */</FONT>
+<A name=299><FONT size=-1>299     </FONT></A>    <B>case</B> M_SOF2:		<FONT color=red>/* Progressive, Huffman */</FONT>
+<A name=300><FONT size=-1>300     </FONT></A>    <B>case</B> M_SOF3:		<FONT color=red>/* Lossless, Huffman */</FONT>
+<A name=301><FONT size=-1>301     </FONT></A>    <B>case</B> M_SOF5:		<FONT color=red>/* Differential sequential, Huffman */</FONT>
+<A name=302><FONT size=-1>302     </FONT></A>    <B>case</B> M_SOF6:		<FONT color=red>/* Differential progressive, Huffman */</FONT>
+<A name=303><FONT size=-1>303     </FONT></A>    <B>case</B> M_SOF7:		<FONT color=red>/* Differential lossless, Huffman */</FONT>
+<A name=304><FONT size=-1>304     </FONT></A>    <B>case</B> M_SOF9:		<FONT color=red>/* Extended sequential, arithmetic */</FONT>
+<A name=305><FONT size=-1>305     </FONT></A>    <B>case</B> M_SOF10:		<FONT color=red>/* Progressive, arithmetic */</FONT>
+<A name=306><FONT size=-1>306     </FONT></A>    <B>case</B> M_SOF11:		<FONT color=red>/* Lossless, arithmetic */</FONT>
+<A name=307><FONT size=-1>307     </FONT></A>    <B>case</B> M_SOF13:		<FONT color=red>/* Differential sequential, arithmetic */</FONT>
+<A name=308><FONT size=-1>308     </FONT></A>    <B>case</B> M_SOF14:		<FONT color=red>/* Differential progressive, arithmetic */</FONT>
+<A name=309><FONT size=-1>309     </FONT></A>    <B>case</B> M_SOF15:		<FONT color=red>/* Differential lossless, arithmetic */</FONT>
+<A name=310><FONT size=-1>310     </FONT></A>      <B>return</B> marker;
+<A name=311><FONT size=-1>311     </FONT></A>
+<A name=312><FONT size=-1>312     </FONT></A>    <B>case</B> M_SOS:			<FONT color=red>/* should not see compressed data before SOF */</FONT>
+<A name=313><FONT size=-1>313     </FONT></A>      ERREXIT(<FONT color=#dc0dc>"SOS without prior SOFn"</FONT>);
+<A name=314><FONT size=-1>314     </FONT></A>      <B>break</B>;
+<A name=315><FONT size=-1>315     </FONT></A>
+<A name=316><FONT size=-1>316     </FONT></A>    <B>case</B> M_EOI:			<FONT color=red>/* in case it's a tables-only JPEG stream */</FONT>
+<A name=317><FONT size=-1>317     </FONT></A>      <B>return</B> marker;
+<A name=318><FONT size=-1>318     </FONT></A>
+<A name=319><FONT size=-1>319     </FONT></A>    <B>case</B> M_COM:			<FONT color=red>/* Existing COM: conditionally discard */</FONT>
+<A name=320><FONT size=-1>320     </FONT></A>      <B>if</B> (keep_COM) <FONT size=+2><B>{</B></FONT>
+<A name=321><FONT size=-1>321     </FONT></A>	write_marker(marker);
+<A name=322><FONT size=-1>322     </FONT></A>	copy_variable();
+<A name=323><FONT size=-1>323     </FONT></A>      <FONT size=+2><B>}</B></FONT> <B>else</B> <FONT size=+2><B>{</B></FONT>
+<A name=324><FONT size=-1>324     </FONT></A>	skip_variable();
+<A name=325><FONT size=-1>325     </FONT></A>      <FONT size=+2><B>}</B></FONT>
+<A name=326><FONT size=-1>326     </FONT></A>      <B>break</B>;
+<A name=327><FONT size=-1>327     </FONT></A>
+<A name=328><FONT size=-1>328     </FONT></A>    <B>default</B>:			<FONT color=red>/* Anything else just gets copied */</FONT>
+<A name=329><FONT size=-1>329     </FONT></A>      write_marker(marker);
+<A name=330><FONT size=-1>330     </FONT></A>      copy_variable();		<FONT color=red>/* we assume it has a parameter count... */</FONT>
+<A name=331><FONT size=-1>331     </FONT></A>      <B>break</B>;
+<A name=332><FONT size=-1>332     </FONT></A>    <FONT size=+2><B>}</B></FONT>
+<A name=333><FONT size=-1>333     </FONT></A>  <FONT size=+2><B>}</B></FONT> <FONT color=red>/* end loop */</FONT>
+<A name=334><FONT size=-1>334     </FONT></A><FONT size=+2><B>}</B></FONT>
+<A name=335><FONT size=-1>335     </FONT></A>
+<A name=336><FONT size=-1>336     </FONT></A>
+<A name=337><FONT size=-1>337     </FONT></A><FONT color=red>/* Command line parsing code */</FONT>
+<A name=338><FONT size=-1>338     </FONT></A>
+<A name=339><FONT size=-1>339     </FONT></A><B>static</B> <B>const</B> <B>char</B> * progname;	<FONT color=red>/* program name for error messages */</FONT>
+<A name=340><FONT size=-1>340     </FONT></A>
+<A name=341><FONT size=-1>341     </FONT></A>
+<A name=342><FONT size=-1>342     </FONT></A><B>static</B> <B>void</B>
+<A name=343><FONT size=-1>343     </FONT></A>usage (void)
+<A name=344><FONT size=-1>344     </FONT></A><FONT color=red>/* complain about bad command line */</FONT>
+<A name=345><FONT size=-1>345     </FONT></A><FONT size=+2><B>{</B></FONT>
+<A name=346><FONT size=-1>346     </FONT></A>  fprintf(stderr, <FONT color=#dc0dc>"wrjpgcom inserts a textual comment in a JPEG file.\n"</FONT>);
+<A name=347><FONT size=-1>347     </FONT></A>  fprintf(stderr, <FONT color=#dc0dc>"You can add to or replace any existing comment(s).\n"</FONT>);
+<A name=348><FONT size=-1>348     </FONT></A>
+<A name=349><FONT size=-1>349     </FONT></A>  fprintf(stderr, <FONT color=#dc0dc>"Usage: %s [switches] "</FONT>, progname);
+<A name=350><FONT size=-1>350     </FONT></A><FONT color=green>#ifdef</FONT> TWO_FILE_COMMANDLINE
+<A name=351><FONT size=-1>351     </FONT></A>  fprintf(stderr, <FONT color=#dc0dc>"inputfile outputfile\n"</FONT>);
+<A name=352><FONT size=-1>352     </FONT></A><FONT color=green>#else</FONT>
+<A name=353><FONT size=-1>353     </FONT></A>  fprintf(stderr, <FONT color=#dc0dc>"[inputfile]\n"</FONT>);
+<A name=354><FONT size=-1>354     </FONT></A><FONT color=green>#endif</FONT>
+<A name=355><FONT size=-1>355     </FONT></A>
+<A name=356><FONT size=-1>356     </FONT></A>  fprintf(stderr, <FONT color=#dc0dc>"Switches (names may be abbreviated):\n"</FONT>);
+<A name=357><FONT size=-1>357     </FONT></A>  fprintf(stderr, <FONT color=#dc0dc>"  -replace         Delete any existing comments\n"</FONT>);
+<A name=358><FONT size=-1>358     </FONT></A>  fprintf(stderr, <FONT color=#dc0dc>"  -comment \"text\"  Insert comment with given text\n"</FONT>);
+<A name=359><FONT size=-1>359     </FONT></A>  fprintf(stderr, <FONT color=#dc0dc>"  -cfile name      Read comment from named file\n"</FONT>);
+<A name=360><FONT size=-1>360     </FONT></A>  fprintf(stderr, <FONT color=#dc0dc>"Notice that you must put quotes around the comment text\n"</FONT>);
+<A name=361><FONT size=-1>361     </FONT></A>  fprintf(stderr, <FONT color=#dc0dc>"when you use -comment.\n"</FONT>);
+<A name=362><FONT size=-1>362     </FONT></A>  fprintf(stderr, <FONT color=#dc0dc>"If you do not give either -comment or -cfile on the command line,\n"</FONT>);
+<A name=363><FONT size=-1>363     </FONT></A>  fprintf(stderr, <FONT color=#dc0dc>"then the comment text is read from standard input.\n"</FONT>);
+<A name=364><FONT size=-1>364     </FONT></A>  fprintf(stderr, <FONT color=#dc0dc>"It can be multiple lines, up to %u characters total.\n"</FONT>,
+<A name=365><FONT size=-1>365     </FONT></A>	  (<B>unsigned</B> int) MAX_COM_LENGTH);
+<A name=366><FONT size=-1>366     </FONT></A><FONT color=green>#ifndef</FONT> TWO_FILE_COMMANDLINE
+<A name=367><FONT size=-1>367     </FONT></A>  fprintf(stderr, <FONT color=#dc0dc>"You must specify an input JPEG file name when supplying\n"</FONT>);
+<A name=368><FONT size=-1>368     </FONT></A>  fprintf(stderr, <FONT color=#dc0dc>"comment text from standard input.\n"</FONT>);
+<A name=369><FONT size=-1>369     </FONT></A><FONT color=green>#endif</FONT>
+<A name=370><FONT size=-1>370     </FONT></A>
+<A name=371><FONT size=-1>371     </FONT></A>  exit(EXIT_FAILURE);
+<A name=372><FONT size=-1>372     </FONT></A><FONT size=+2><B>}</B></FONT>
+<A name=373><FONT size=-1>373     </FONT></A>
+<A name=374><FONT size=-1>374     </FONT></A>
+<A name=375><FONT size=-1>375     </FONT></A><B>static</B> <B>int</B>
+<A name=376><FONT size=-1>376     </FONT></A>keymatch (<B>char</B> * arg, <B>const</B> <B>char</B> * keyword, <B>int</B> minchars)
+<A name=377><FONT size=-1>377     </FONT></A><FONT color=red>/* Case-insensitive matching of (possibly abbreviated) keyword switches. */</FONT>
+<A name=378><FONT size=-1>378     </FONT></A><FONT color=red>/* keyword is the constant keyword (must be lower case already), */</FONT>
+<A name=379><FONT size=-1>379     </FONT></A><FONT color=red>/* minchars is length of minimum legal abbreviation. */</FONT>
+<A name=380><FONT size=-1>380     </FONT></A><FONT size=+2><B>{</B></FONT>
+<A name=381><FONT size=-1>381     </FONT></A>  <B>register</B> <B>int</B> ca, ck;
+<A name=382><FONT size=-1>382     </FONT></A>  <B>register</B> <B>int</B> nmatched = 0;
+<A name=383><FONT size=-1>383     </FONT></A>
+<A name=384><FONT size=-1>384     </FONT></A>  <B>while</B> ((ca = *arg++) != <FONT color=#dc0dc>'\0'</FONT>) <FONT size=+2><B>{</B></FONT>
+<A name=385><FONT size=-1>385     </FONT></A>    <B>if</B> ((ck = *keyword++) == <FONT color=#dc0dc>'\0'</FONT>)
+<A name=386><FONT size=-1>386     </FONT></A>      <B>return</B> 0;			<FONT color=red>/* arg longer than keyword, no good */</FONT>
+<A name=387><FONT size=-1>387     </FONT></A>    <B>if</B> (isupper(ca))		<FONT color=red>/* force arg to lcase (assume ck is already) */</FONT>
+<A name=388><FONT size=-1>388     </FONT></A>      ca = tolower(ca);
+<A name=389><FONT size=-1>389     </FONT></A>    <B>if</B> (ca != ck)
+<A name=390><FONT size=-1>390     </FONT></A>      <B>return</B> 0;			<FONT color=red>/* no good */</FONT>
+<A name=391><FONT size=-1>391     </FONT></A>    nmatched++;			<FONT color=red>/* count matched characters */</FONT>
+<A name=392><FONT size=-1>392     </FONT></A>  <FONT size=+2><B>}</B></FONT>
+<A name=393><FONT size=-1>393     </FONT></A>  <FONT color=red>/* reached end of argument; fail if it's too short for unique abbrev */</FONT>
+<A name=394><FONT size=-1>394     </FONT></A>  <B>if</B> (nmatched &lt; minchars)
+<A name=395><FONT size=-1>395     </FONT></A>    <B>return</B> 0;
+<A name=396><FONT size=-1>396     </FONT></A>  <B>return</B> 1;			<FONT color=red>/* A-OK */</FONT>
+<A name=397><FONT size=-1>397     </FONT></A><FONT size=+2><B>}</B></FONT>
+<A name=398><FONT size=-1>398     </FONT></A>
+<A name=399><FONT size=-1>399     </FONT></A>
+<A name=400><FONT size=-1>400     </FONT></A><FONT color=red>/*
+<A name=401><FONT color=#000000 size=-1>401     </FONT></A> * The main program.
+<A name=402><FONT color=#000000 size=-1>402     </FONT></A> */</FONT>
+<A name=403><FONT size=-1>403     </FONT></A>
+<A name=404><FONT size=-1>404     </FONT></A><B>int</B>
+<A name=405><FONT size=-1>405     </FONT></A>main (<B>int</B> argc, <B>char</B> **argv)
+<A name=406><FONT size=-1>406     </FONT></A><FONT size=+2><B>{</B></FONT>
+<A name=407><FONT size=-1>407     </FONT></A>  <B>int</B> argn;
+<A name=408><FONT size=-1>408     </FONT></A>  <B>char</B> * arg;
+<A name=409><FONT size=-1>409     </FONT></A>  <B>int</B> keep_COM = 1;
+<A name=410><FONT size=-1>410     </FONT></A>  <B>char</B> * comment_arg = NULL;
+<A name=411><FONT size=-1>411     </FONT></A>  FILE * comment_file = NULL;
+<A name=412><FONT size=-1>412     </FONT></A>  <B>unsigned</B> <B>int</B> comment_length = 0;
+<A name=413><FONT size=-1>413     </FONT></A>  <B>int</B> marker;
+<A name=414><FONT size=-1>414     </FONT></A>
+<A name=415><FONT size=-1>415     </FONT></A>  <FONT color=red>/* On Mac, fetch a command line. */</FONT>
+<A name=416><FONT size=-1>416     </FONT></A><FONT color=green>#ifdef</FONT> USE_CCOMMAND
+<A name=417><FONT size=-1>417     </FONT></A>  argc = ccommand(&amp;argv);
+<A name=418><FONT size=-1>418     </FONT></A><FONT color=green>#endif</FONT>
+<A name=419><FONT size=-1>419     </FONT></A>
+<A name=420><FONT size=-1>420     </FONT></A>  progname = argv[0];
+<A name=421><FONT size=-1>421     </FONT></A>  <B>if</B> (progname == NULL || progname[0] == 0)
+<A name=422><FONT size=-1>422     </FONT></A>    progname = <FONT color=#dc0dc>"wrjpgcom"</FONT>;	<FONT color=red>/* in case C library doesn't provide it */</FONT>
+<A name=423><FONT size=-1>423     </FONT></A>
+<A name=424><FONT size=-1>424     </FONT></A>  <FONT color=red>/* Parse switches, if any */</FONT>
+<A name=425><FONT size=-1>425     </FONT></A>  <B>for</B> (argn = 1; argn &lt; argc; argn++) <FONT size=+2><B>{</B></FONT>
+<A name=426><FONT size=-1>426     </FONT></A>    arg = argv[argn];
+<A name=427><FONT size=-1>427     </FONT></A>    <B>if</B> (arg[0] != <FONT color=#dc0dc>'-'</FONT>)
+<A name=428><FONT size=-1>428     </FONT></A>      <B>break</B>;			<FONT color=red>/* not switch, must be file name */</FONT>
+<A name=429><FONT size=-1>429     </FONT></A>    arg++;			<FONT color=red>/* advance over '-' */</FONT>
+<A name=430><FONT size=-1>430     </FONT></A>    <B>if</B> (keymatch(arg, <FONT color=#dc0dc>"replace"</FONT>, 1)) <FONT size=+2><B>{</B></FONT>
+<A name=431><FONT size=-1>431     </FONT></A>      keep_COM = 0;
+<A name=432><FONT size=-1>432     </FONT></A>    <FONT size=+2><B>}</B></FONT> <B>else</B> <B>if</B> (keymatch(arg, <FONT color=#dc0dc>"cfile"</FONT>, 2)) <FONT size=+2><B>{</B></FONT>
+<A name=433><FONT size=-1>433     </FONT></A>      <B>if</B> (++argn &gt;= argc) usage();
+<A name=434><FONT size=-1>434     </FONT></A>      <B>if</B> ((comment_file = fopen(argv[argn], <FONT color=#dc0dc>"r"</FONT>)) == NULL) <FONT size=+2><B>{</B></FONT>
+<A name=435><FONT size=-1>435     </FONT></A>	fprintf(stderr, <FONT color=#dc0dc>"%s: can't open %s\n"</FONT>, progname, argv[argn]);
+<A name=436><FONT size=-1>436     </FONT></A>	exit(EXIT_FAILURE);
+<A name=437><FONT size=-1>437     </FONT></A>      <FONT size=+2><B>}</B></FONT>
+<A name=438><FONT size=-1>438     </FONT></A>    <FONT size=+2><B>}</B></FONT> <B>else</B> <B>if</B> (keymatch(arg, <FONT color=#dc0dc>"comment"</FONT>, 1)) <FONT size=+2><B>{</B></FONT>
+<A name=439><FONT size=-1>439     </FONT></A>      <B>if</B> (++argn &gt;= argc) usage();
+<A name=440><FONT size=-1>440     </FONT></A>      comment_arg = argv[argn];
+<A name=441><FONT size=-1>441     </FONT></A>      <FONT color=red>/* If the comment text starts with '"', then we are probably running
+<A name=442><FONT color=#000000 size=-1>442     </FONT></A>       * under MS-DOG and must parse out the quoted string ourselves.  Sigh.
+<A name=443><FONT color=#000000 size=-1>443     </FONT></A>       */</FONT>
+<A name=444><FONT size=-1>444     </FONT></A>      <B>if</B> (comment_arg[0] == <FONT color=#dc0dc>'"'</FONT>) <FONT size=+2><B>{</B></FONT>
+<A name=445><FONT size=-1>445     </FONT></A>	comment_arg = (<B>char</B> *) malloc((size_t) MAX_COM_LENGTH);
+<A name=446><FONT size=-1>446     </FONT></A>	<B>if</B> (comment_arg == NULL)
+<A name=447><FONT size=-1>447     </FONT></A>	  ERREXIT(<FONT color=#dc0dc>"Insufficient memory"</FONT>);
+<A name=448><FONT size=-1>448     </FONT></A>	strcpy(comment_arg, argv[argn]+1);
+<A name=449><FONT size=-1>449     </FONT></A>	<B>for</B> (;;) <FONT size=+2><B>{</B></FONT>
+<A name=450><FONT size=-1>450     </FONT></A>	  comment_length = strlen(comment_arg);
+<A name=451><FONT size=-1>451     </FONT></A>	  <B>if</B> (comment_length &gt; 0 &amp;&amp; comment_arg[comment_length-1] == <FONT color=#dc0dc>'"'</FONT>) <FONT size=+2><B>{</B></FONT>
+<A name=452><FONT size=-1>452     </FONT></A>	    comment_arg[comment_length-1] = <FONT color=#dc0dc>'\0'</FONT>; <FONT color=red>/* zap terminating quote */</FONT>
+<A name=453><FONT size=-1>453     </FONT></A>	    <B>break</B>;
+<A name=454><FONT size=-1>454     </FONT></A>	  <FONT size=+2><B>}</B></FONT>
+<A name=455><FONT size=-1>455     </FONT></A>	  <B>if</B> (++argn &gt;= argc)
+<A name=456><FONT size=-1>456     </FONT></A>	    ERREXIT(<FONT color=#dc0dc>"Missing ending quote mark"</FONT>);
+<A name=457><FONT size=-1>457     </FONT></A>	  strcat(comment_arg, <FONT color=#dc0dc>" "</FONT>);
+<A name=458><FONT size=-1>458     </FONT></A>	  strcat(comment_arg, argv[argn]);
+<A name=459><FONT size=-1>459     </FONT></A>	<FONT size=+2><B>}</B></FONT>
+<A name=460><FONT size=-1>460     </FONT></A>      <FONT size=+2><B>}</B></FONT>
+<A name=461><FONT size=-1>461     </FONT></A>      comment_length = strlen(comment_arg);
+<A name=462><FONT size=-1>462     </FONT></A>    <FONT size=+2><B>}</B></FONT> <B>else</B>
+<A name=463><FONT size=-1>463     </FONT></A>      usage();
+<A name=464><FONT size=-1>464     </FONT></A>  <FONT size=+2><B>}</B></FONT>
+<A name=465><FONT size=-1>465     </FONT></A>
+<A name=466><FONT size=-1>466     </FONT></A>  <FONT color=red>/* Cannot use both -comment and -cfile. */</FONT>
+<A name=467><FONT size=-1>467     </FONT></A>  <B>if</B> (comment_arg != NULL &amp;&amp; comment_file != NULL)
+<A name=468><FONT size=-1>468     </FONT></A>    usage();
+<A name=469><FONT size=-1>469     </FONT></A>  <FONT color=red>/* If there is neither -comment nor -cfile, we will read the comment text
+<A name=470><FONT color=#000000 size=-1>470     </FONT></A>   * from stdin; in this case there MUST be an input JPEG file name.
+<A name=471><FONT color=#000000 size=-1>471     </FONT></A>   */</FONT>
+<A name=472><FONT size=-1>472     </FONT></A>  <B>if</B> (comment_arg == NULL &amp;&amp; comment_file == NULL &amp;&amp; argn &gt;= argc)
+<A name=473><FONT size=-1>473     </FONT></A>    usage();
+<A name=474><FONT size=-1>474     </FONT></A>
+<A name=475><FONT size=-1>475     </FONT></A>  <FONT color=red>/* Open the input file. */</FONT>
+<A name=476><FONT size=-1>476     </FONT></A>  <B>if</B> (argn &lt; argc) <FONT size=+2><B>{</B></FONT>
+<A name=477><FONT size=-1>477     </FONT></A>    <B>if</B> ((infile = fopen(argv[argn], READ_BINARY)) == NULL) <FONT size=+2><B>{</B></FONT>
+<A name=478><FONT size=-1>478     </FONT></A>      fprintf(stderr, <FONT color=#dc0dc>"%s: can't open %s\n"</FONT>, progname, argv[argn]);
+<A name=479><FONT size=-1>479     </FONT></A>      exit(EXIT_FAILURE);
+<A name=480><FONT size=-1>480     </FONT></A>    <FONT size=+2><B>}</B></FONT>
+<A name=481><FONT size=-1>481     </FONT></A>  <FONT size=+2><B>}</B></FONT> <B>else</B> <FONT size=+2><B>{</B></FONT>
+<A name=482><FONT size=-1>482     </FONT></A>    <FONT color=red>/* default input file is stdin */</FONT>
+<A name=483><FONT size=-1>483     </FONT></A><FONT color=green>#ifdef</FONT> USE_SETMODE		<FONT color=red>/* need to hack file mode? */</FONT>
+<A name=484><FONT size=-1>484     </FONT></A>    setmode(fileno(stdin), O_BINARY);
+<A name=485><FONT size=-1>485     </FONT></A><FONT color=green>#endif</FONT>
+<A name=486><FONT size=-1>486     </FONT></A><FONT color=green>#ifdef</FONT> USE_FDOPEN		<FONT color=red>/* need to re-open in binary mode? */</FONT>
+<A name=487><FONT size=-1>487     </FONT></A>    <B>if</B> ((infile = fdopen(fileno(stdin), READ_BINARY)) == NULL) <FONT size=+2><B>{</B></FONT>
+<A name=488><FONT size=-1>488     </FONT></A>      fprintf(stderr, <FONT color=#dc0dc>"%s: can't open stdin\n"</FONT>, progname);
+<A name=489><FONT size=-1>489     </FONT></A>      exit(EXIT_FAILURE);
+<A name=490><FONT size=-1>490     </FONT></A>    <FONT size=+2><B>}</B></FONT>
+<A name=491><FONT size=-1>491     </FONT></A><FONT color=green>#else</FONT>
+<A name=492><FONT size=-1>492     </FONT></A>    infile = stdin;
+<A name=493><FONT size=-1>493     </FONT></A><FONT color=green>#endif</FONT>
+<A name=494><FONT size=-1>494     </FONT></A>  <FONT size=+2><B>}</B></FONT>
+<A name=495><FONT size=-1>495     </FONT></A>
+<A name=496><FONT size=-1>496     </FONT></A>  <FONT color=red>/* Open the output file. */</FONT>
+<A name=497><FONT size=-1>497     </FONT></A><FONT color=green>#ifdef</FONT> TWO_FILE_COMMANDLINE
+<A name=498><FONT size=-1>498     </FONT></A>  <FONT color=red>/* Must have explicit output file name */</FONT>
+<A name=499><FONT size=-1>499     </FONT></A>  <B>if</B> (argn != argc-2) <FONT size=+2><B>{</B></FONT>
+<A name=500><FONT size=-1>500     </FONT></A>    fprintf(stderr, <FONT color=#dc0dc>"%s: must name one input and one output file\n"</FONT>,
+<A name=501><FONT size=-1>501     </FONT></A>	    progname);
+<A name=502><FONT size=-1>502     </FONT></A>    usage();
+<A name=503><FONT size=-1>503     </FONT></A>  <FONT size=+2><B>}</B></FONT>
+<A name=504><FONT size=-1>504     </FONT></A>  <B>if</B> ((outfile = fopen(argv[argn+1], WRITE_BINARY)) == NULL) <FONT size=+2><B>{</B></FONT>
+<A name=505><FONT size=-1>505     </FONT></A>    fprintf(stderr, <FONT color=#dc0dc>"%s: can't open %s\n"</FONT>, progname, argv[argn+1]);
+<A name=506><FONT size=-1>506     </FONT></A>    exit(EXIT_FAILURE);
+<A name=507><FONT size=-1>507     </FONT></A>  <FONT size=+2><B>}</B></FONT>
+<A name=508><FONT size=-1>508     </FONT></A><FONT color=green>#else</FONT>
+<A name=509><FONT size=-1>509     </FONT></A>  <FONT color=red>/* Unix style: expect zero or one file name */</FONT>
+<A name=510><FONT size=-1>510     </FONT></A>  <B>if</B> (argn &lt; argc-1) <FONT size=+2><B>{</B></FONT>
+<A name=511><FONT size=-1>511     </FONT></A>    fprintf(stderr, <FONT color=#dc0dc>"%s: only one input file\n"</FONT>, progname);
+<A name=512><FONT size=-1>512     </FONT></A>    usage();
+<A name=513><FONT size=-1>513     </FONT></A>  <FONT size=+2><B>}</B></FONT>
+<A name=514><FONT size=-1>514     </FONT></A>  <FONT color=red>/* default output file is stdout */</FONT>
+<A name=515><FONT size=-1>515     </FONT></A><FONT color=green>#ifdef</FONT> USE_SETMODE		<FONT color=red>/* need to hack file mode? */</FONT>
+<A name=516><FONT size=-1>516     </FONT></A>  setmode(fileno(stdout), O_BINARY);
+<A name=517><FONT size=-1>517     </FONT></A><FONT color=green>#endif</FONT>
+<A name=518><FONT size=-1>518     </FONT></A><FONT color=green>#ifdef</FONT> USE_FDOPEN		<FONT color=red>/* need to re-open in binary mode? */</FONT>
+<A name=519><FONT size=-1>519     </FONT></A>  <B>if</B> ((outfile = fdopen(fileno(stdout), WRITE_BINARY)) == NULL) <FONT size=+2><B>{</B></FONT>
+<A name=520><FONT size=-1>520     </FONT></A>    fprintf(stderr, <FONT color=#dc0dc>"%s: can't open stdout\n"</FONT>, progname);
+<A name=521><FONT size=-1>521     </FONT></A>    exit(EXIT_FAILURE);
+<A name=522><FONT size=-1>522     </FONT></A>  <FONT size=+2><B>}</B></FONT>
+<A name=523><FONT size=-1>523     </FONT></A><FONT color=green>#else</FONT>
+<A name=524><FONT size=-1>524     </FONT></A>  outfile = stdout;
+<A name=525><FONT size=-1>525     </FONT></A><FONT color=green>#endif</FONT>
+<A name=526><FONT size=-1>526     </FONT></A><FONT color=green>#endif</FONT> <FONT color=red>/* TWO_FILE_COMMANDLINE */</FONT>
+<A name=527><FONT size=-1>527     </FONT></A>
+<A name=528><FONT size=-1>528     </FONT></A>  <FONT color=red>/* Collect comment text from comment_file or stdin, if necessary */</FONT>
+<A name=529><FONT size=-1>529     </FONT></A>  <B>if</B> (comment_arg == NULL) <FONT size=+2><B>{</B></FONT>
+<A name=530><FONT size=-1>530     </FONT></A>    FILE * src_file;
+<A name=531><FONT size=-1>531     </FONT></A>    <B>int</B> c;
+<A name=532><FONT size=-1>532     </FONT></A>
+<A name=533><FONT size=-1>533     </FONT></A>    comment_arg = (<B>char</B> *) malloc((size_t) MAX_COM_LENGTH);
+<A name=534><FONT size=-1>534     </FONT></A>    <B>if</B> (comment_arg == NULL)
+<A name=535><FONT size=-1>535     </FONT></A>      ERREXIT(<FONT color=#dc0dc>"Insufficient memory"</FONT>);
+<A name=536><FONT size=-1>536     </FONT></A>    comment_length = 0;
+<A name=537><FONT size=-1>537     </FONT></A>    src_file = (comment_file != NULL ? comment_file : stdin);
+<A name=538><FONT size=-1>538     </FONT></A>    <B>while</B> ((c = getc(src_file)) != EOF) <FONT size=+2><B>{</B></FONT>
+<A name=539><FONT size=-1>539     </FONT></A>      <B>if</B> (comment_length &gt;= (<B>unsigned</B> int) MAX_COM_LENGTH) <FONT size=+2><B>{</B></FONT>
+<A name=540><FONT size=-1>540     </FONT></A>	fprintf(stderr, <FONT color=#dc0dc>"Comment text may not exceed %u bytes\n"</FONT>,
+<A name=541><FONT size=-1>541     </FONT></A>		(<B>unsigned</B> int) MAX_COM_LENGTH);
+<A name=542><FONT size=-1>542     </FONT></A>	exit(EXIT_FAILURE);
+<A name=543><FONT size=-1>543     </FONT></A>      <FONT size=+2><B>}</B></FONT>
+<A name=544><FONT size=-1>544     </FONT></A>      comment_arg[comment_length++] = (char) c;
+<A name=545><FONT size=-1>545     </FONT></A>    <FONT size=+2><B>}</B></FONT>
+<A name=546><FONT size=-1>546     </FONT></A>    <B>if</B> (comment_file != NULL)
+<A name=547><FONT size=-1>547     </FONT></A>      fclose(comment_file);
+<A name=548><FONT size=-1>548     </FONT></A>  <FONT size=+2><B>}</B></FONT>
+<A name=549><FONT size=-1>549     </FONT></A>
+<A name=550><FONT size=-1>550     </FONT></A>  <FONT color=red>/* Copy JPEG headers until SOFn marker;
+<A name=551><FONT color=#000000 size=-1>551     </FONT></A>   * we will insert the new comment marker just before SOFn.
+<A name=552><FONT color=#000000 size=-1>552     </FONT></A>   * This (a) causes the new comment to appear after, rather than before,
+<A name=553><FONT color=#000000 size=-1>553     </FONT></A>   * existing comments; and (b) ensures that comments come after any JFIF
+<A name=554><FONT color=#000000 size=-1>554     </FONT></A>   * or JFXX markers, as required by the JFIF specification.
+<A name=555><FONT color=#000000 size=-1>555     </FONT></A>   */</FONT>
+<A name=556><FONT size=-1>556     </FONT></A>  marker = scan_JPEG_header(keep_COM);
+<A name=557><FONT size=-1>557     </FONT></A>  <FONT color=red>/* Insert the new COM marker, but only if nonempty text has been supplied */</FONT>
+<A name=558><FONT size=-1>558     </FONT></A>  <B>if</B> (comment_length &gt; 0) <FONT size=+2><B>{</B></FONT>
+<A name=559><FONT size=-1>559     </FONT></A>    write_marker(M_COM);
+<A name=560><FONT size=-1>560     </FONT></A>    write_2_bytes(comment_length + 2);
+<A name=561><FONT size=-1>561     </FONT></A>    <B>while</B> (comment_length &gt; 0) <FONT size=+2><B>{</B></FONT>
+<A name=562><FONT size=-1>562     </FONT></A>      write_1_byte(*comment_arg++);
+<A name=563><FONT size=-1>563     </FONT></A>      comment_length--;
+<A name=564><FONT size=-1>564     </FONT></A>    <FONT size=+2><B>}</B></FONT>
+<A name=565><FONT size=-1>565     </FONT></A>  <FONT size=+2><B>}</B></FONT>
+<A name=566><FONT size=-1>566     </FONT></A>  <FONT color=red>/* Duplicate the remainder of the source file.
+<A name=567><FONT color=#000000 size=-1>567     </FONT></A>   * Note that any COM markers occuring after SOF will not be touched.
+<A name=568><FONT color=#000000 size=-1>568     </FONT></A>   */</FONT>
+<A name=569><FONT size=-1>569     </FONT></A>  write_marker(marker);
+<A name=570><FONT size=-1>570     </FONT></A>  copy_rest_of_file();
+<A name=571><FONT size=-1>571     </FONT></A>
+<A name=572><FONT size=-1>572     </FONT></A>  <FONT color=red>/* All done. */</FONT>
+<A name=573><FONT size=-1>573     </FONT></A>  exit(EXIT_SUCCESS);
+<A name=574><FONT size=-1>574     </FONT></A>  <B>return</B> 0;			<FONT color=red>/* suppress no-return-value warnings */</FONT>
+<A name=575><FONT size=-1>575     </FONT></A><FONT size=+2><B>}</B></FONT>
+</PRE></BODY></HTML>
